@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>取材メモ チェッカー</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Noto Sans JP', sans-serif; background: #f5f5f5; color: #333; }
+  .container { max-width: 600px; margin: 0 auto; padding: 20px 16px 60px; }
+  h1 { font-size: 18px; font-weight: 700; margin-bottom: 6px; color: #111; }
+  .subtitle { font-size: 13px; color: #888; margin-bottom: 20px; }
+  .card { background: #fff; border-radius: 12px; padding: 18px; margin-bottom: 14px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+  label { display: block; font-size: 13px; font-weight: 600; color: #555; margin-bottom: 8px; }
+  textarea {
+    width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px;
+    font-size: 15px; font-family: inherit; line-height: 1.7; resize: vertical;
+    -webkit-appearance: none;
+  }
+  textarea:focus { outline: none; border-color: #5b7fff; }
+  .btn-check {
+    width: 100%; padding: 16px; background: #5b7fff; color: #fff;
+    border: none; border-radius: 10px; font-size: 16px; font-weight: 700;
+    cursor: pointer; margin-top: 12px; letter-spacing: 0.03em;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .btn-check:active { opacity: 0.85; }
+  .btn-clear {
+    width: 100%; padding: 12px; background: #eee; color: #666;
+    border: none; border-radius: 10px; font-size: 14px; font-weight: 600;
+    cursor: pointer; margin-top: 8px;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .checklist { display: none; margin-top: 4px; }
+  .check-summary {
+    font-size: 14px; padding: 12px 16px; border-radius: 10px;
+    margin-bottom: 14px; font-weight: 700; line-height: 1.5;
+  }
+  .check-summary.all-ok { background: #d4edda; color: #155724; }
+  .check-summary.has-warn { background: #fff3cd; color: #856404; }
+  .check-summary.has-ng { background: #f8d7da; color: #721c24; }
+  .check-group { background: #fff; border-radius: 12px; margin-bottom: 10px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,0.07); }
+  .check-group-title {
+    font-size: 11px; font-weight: 700; color: #888; text-transform: uppercase;
+    letter-spacing: 0.06em; padding: 10px 14px 6px;
+    border-bottom: 1px solid #f0f0f0;
+  }
+  .check-item {
+    display: flex; align-items: flex-start; gap: 10px;
+    padding: 12px 14px; border-bottom: 1px solid #f7f7f7;
+  }
+  .check-item:last-child { border-bottom: none; }
+  .check-item.ok { background: #fafffe; }
+  .check-item.warn { background: #fffef8; }
+  .check-item.ng { background: #fffafa; }
+  .check-icon { font-size: 18px; flex-shrink: 0; padding-top: 1px; }
+  .check-text strong { display: block; font-size: 14px; font-weight: 600; margin-bottom: 2px; }
+  .check-text span { font-size: 12px; color: #999; line-height: 1.4; }
+  .char-count { font-size: 12px; color: #bbb; text-align: right; margin-top: 4px; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>取材メモ ヌケモレチェッカー</h1>
+  <p class="subtitle">文字起こしを貼ってチェックしましょう</p>
+
+  <div class="card">
+    <label>取材メモ（文字起こしをそのまま貼る）</label>
+    <textarea id="notes" rows="10" placeholder="ChatGPTで文字起こしした内容をそのまま貼り付けてください..."></textarea>
+    <div class="char-count" id="char-count">0文字</div>
+    <button class="btn-check" onclick="checkNotes()">ヌケモレチェック</button>
+    <button class="btn-clear" onclick="clearAll()">クリア</button>
+  </div>
+
+  <div class="checklist" id="checklist">
+    <div id="check-summary" class="check-summary"></div>
+
+    <div class="check-group">
+      <div class="check-group-title">外見・体（忘れやすい）</div>
+      <div id="chk-face" class="check-item">
+        <span class="check-icon"></span>
+        <div class="check-text"><strong>顔の特徴・雰囲気</strong><span>清楚系・モデル系・可愛い系など</span></div>
+      </div>
+      <div id="chk-lookalike" class="check-item">
+        <span class="check-icon"></span>
+        <div class="check-text"><strong>誰似・芸能人に例える</strong><span>〇〇に似てる、〇〇系など</span></div>
+      </div>
+      <div id="chk-underhair" class="check-item">
+        <span class="check-icon"></span>
+        <div class="check-text"><strong>アンダーヘア</strong><span>パイパン・薄め・処理済みなど</span></div>
+      </div>
+      <div id="chk-body" class="check-item">
+        <span class="check-icon"></span>
+        <div class="check-text"><strong>胸・お尻・脚の印象</strong><span>柔らかい・張り・形・ボリュームなど</span></div>
+      </div>
+      <div id="chk-skin" class="check-item">
+        <span class="check-icon"></span>
+        <div class="check-text"><strong>肌の質感・色</strong><span>色白・ツルツル・キメ細かいなど</span></div>
+      </div>
+    </div>
+
+    <div class="check-group">
+      <div class="check-group-title">プレイ内容</div>
+      <div id="chk-play" class="check-item">
+        <span class="check-icon"></span>
+        <div class="check-text"><strong>プレイの種類・流れ</strong><span>フェラ・騎乗位・正常位など</span></div>
+      </div>
+      <div id="chk-reaction" class="check-item">
+        <span class="check-icon"></span>
+        <div class="check-text"><strong>女性の反応・敏感な部位</strong><span>クリが弱い・腰を振る・感度高めなど</span></div>
+      </div>
+      <div id="chk-voice" class="check-item">
+        <span class="check-icon"></span>
+        <div class="check-text"><strong>声・喘ぎ声の描写</strong><span>甘い声・大きめ・抑えた感じなど</span></div>
+      </div>
+    </div>
+
+    <div class="check-group">
+      <div class="check-group-title">接客・ホテル</div>
+      <div id="chk-shower" class="check-item">
+        <span class="check-icon"></span>
+        <div class="check-text"><strong>シャワー前後の対応</strong><span>一緒に入る・拭いてくれるなど</span></div>
+      </div>
+      <div id="chk-talk" class="check-item">
+        <span class="check-icon"></span>
+        <div class="check-text"><strong>会話・帰り際の様子</strong><span>話が弾む・ハグして見送りなど</span></div>
+      </div>
+      <div id="chk-hotel" class="check-item">
+        <span class="check-icon"></span>
+        <div class="check-text"><strong>ホテル・部屋の様子</strong><span>ホテル名・場所・部屋の雰囲気など</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const rules = [
+    { id: 'chk-face',      important: true,  keywords: ['顔','目元','鼻','口','唇','顎','雰囲気','系','印象','可愛','きれい','綺麗','美人','派手','清楚','大人っぽ','童顔','キツめ','やさし','ふんわり','クール','エロい顔','顔立ち'] },
+    { id: 'chk-lookalike', important: true,  keywords: ['似','みたい','ような','っぽい','系の','に近い'] },
+    { id: 'chk-underhair', important: true,  keywords: ['アンダー','ヘア','毛','剃','パイパン','薄','濃','処理','うぶ毛','産毛','無毛','ヘアー'] },
+    { id: 'chk-body',      important: false, keywords: ['胸','おっぱい','バスト','お尻','尻','腰','脚','足','太もも','スタイル','柔らか','やわらか','張り','形','ボリューム','むっちり','細い','スレンダー'] },
+    { id: 'chk-skin',      important: false, keywords: ['肌','白','色白','ツルツル','すべすべ','キメ','肌質','色味','焼け','透明感'] },
+    { id: 'chk-play',      important: false, keywords: ['フェラ','チク','騎乗','正常','バック','後ろ','69','シックス','素股','手コキ','プレイ','本番','挿入','コンドーム','ゴム','口で','舐め'] },
+    { id: 'chk-reaction',  important: false, keywords: ['反応','感じ','敏感','イク','いく','弱い','急所','弱点','感度','腰を','動き','ビク','ビクビク','よがり'] },
+    { id: 'chk-voice',     important: false, keywords: ['声','喘','あえ','はぁ','あっ','うっ','んっ','声量','大き','小さ','甘い','かわい','鳴き','喋り'] },
+    { id: 'chk-shower',    important: false, keywords: ['シャワー','洗','拭','タオル','ふいて','お湯','一緒に入','浴びて'] },
+    { id: 'chk-talk',      important: false, keywords: ['話','会話','喋','トーク','笑','終わり','帰り','見送','ハグ','別れ','退室','雑談','キス','最後'] },
+    { id: 'chk-hotel',     important: false, keywords: ['ホテル','部屋','ルーム','場所','マンション','ソファ','ベッド','内装','広','狭','綺麗','汚','清潔'] },
+  ];
+
+  document.getElementById('notes').addEventListener('input', function() {
+    document.getElementById('char-count').textContent = this.value.length + '文字';
+  });
+
+  function checkNotes() {
+    const text = document.getElementById('notes').value;
+    if (!text.trim()) { alert('先にメモを貼り付けてください'); return; }
+
+    let ngCount = 0, warnCount = 0;
+
+    rules.forEach(rule => {
+      const found = rule.keywords.some(kw => text.includes(kw));
+      const el = document.getElementById(rule.id);
+      const icon = el.querySelector('.check-icon');
+
+      if (found) {
+        el.className = 'check-item ok';
+        icon.textContent = '✅';
+      } else if (rule.important) {
+        el.className = 'check-item ng';
+        icon.textContent = '❌';
+        ngCount++;
+      } else {
+        el.className = 'check-item warn';
+        icon.textContent = '⚠️';
+        warnCount++;
+      }
+    });
+
+    const summary = document.getElementById('check-summary');
+    if (ngCount > 0) {
+      summary.className = 'check-summary has-ng';
+      summary.textContent = `❌ 重要な情報が ${ngCount} 項目不足しています。追加してから再チェックを。`;
+    } else if (warnCount > 0) {
+      summary.className = 'check-summary has-warn';
+      summary.textContent = `⚠️ あると充実する項目が ${warnCount} 件あります。`;
+    } else {
+      summary.className = 'check-summary all-ok';
+      summary.textContent = '✅ 必要な情報がすべて揃っています！';
+    }
+
+    document.getElementById('checklist').style.display = 'block';
+    document.getElementById('checklist').scrollIntoView({ behavior: 'smooth' });
+  }
+
+  function clearAll() {
+    document.getElementById('notes').value = '';
+    document.getElementById('char-count').textContent = '0文字';
+    document.getElementById('checklist').style.display = 'none';
+  }
+</script>
+</body>
+</html>
