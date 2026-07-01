@@ -102,6 +102,14 @@
         <span class="check-icon"></span>
         <div class="check-text"><strong>誰似・芸能人に例える</strong><span>〇〇に似てる、〇〇系など</span></div>
       </div>
+      <div id="chk-panemaji" class="check-item">
+        <span class="check-icon"></span>
+        <div class="check-text"><strong>写真との一致度</strong><span>一致・パネマジ気味・別人級など</span></div>
+      </div>
+      <div id="chk-outfit" class="check-item">
+        <span class="check-icon"></span>
+        <div class="check-text"><strong>入室時の服装</strong><span>色・デザイン・下着など</span></div>
+      </div>
       <div id="chk-underhair" class="check-item">
         <span class="check-icon"></span>
         <div class="check-text"><strong>アンダーヘア</strong><span>パイパン・薄め・処理済みなど</span></div>
@@ -154,6 +162,8 @@
   const rules = [
     { id: 'chk-face',      important: true,  q: '顔の印象は？（清楚系・童顔・大人っぽいなど）', keywords: ['顔','目元','鼻','口','唇','顎','雰囲気','系','印象','可愛','きれい','綺麗','美人','派手','清楚','大人っぽ','童顔','キツめ','やさし','ふんわり','クール','エロい顔','顔立ち'] },
     { id: 'chk-lookalike', important: true,  q: '誰かに似てた？（〇〇っぽい・〇〇系など）', keywords: ['似','みたい','ような','っぽい','系の','に近い'] },
+    { id: 'chk-panemaji',  important: true,  q: '写真と実物はどうだった？（一致・パネマジ気味・別人級など）', keywords: ['パネマジ','写真','プロフ','プロフィール','一致','別人','そのまま','イメージ通り','違う','別物'] },
+    { id: 'chk-outfit',    important: false, q: '入室時の服装は？（色・デザインなど）', keywords: ['ワンピース','制服','コスプレ','スカート','パンツ','着て','服','コーデ','下着','ブラ','ランジェリー','衣装'] },
     { id: 'chk-underhair', important: true,  q: 'アンダーは？（パイパン・薄め・普通など）', keywords: ['アンダー','ヘア','毛','剃','パイパン','薄','濃','処理','うぶ毛','産毛','無毛','ヘアー'] },
     { id: 'chk-body',      important: false, q: 'ボディで印象に残った部位は？', keywords: ['胸','おっぱい','バスト','お尻','尻','腰','脚','足','太もも','スタイル','柔らか','やわらか','張り','形','ボリューム','むっちり','細い','スレンダー'] },
     { id: 'chk-skin',      important: false, q: '肌はどうだった？（色白・スベスベなど）', keywords: ['肌','白','色白','ツルツル','すべすべ','キメ','肌質','色味','焼け','透明感'] },
