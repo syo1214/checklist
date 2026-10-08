@@ -86,8 +86,8 @@
     <button class="btn-clear" onclick="clearAll()">クリア</button>
   </div>
 
-  <button class="btn-copy-supp" id="btn-copy-supp" onclick="copySupplements()">📋 補足メモをコピーして記事ツールに貼る</button>
-  <div class="copy-done" id="copy-done">✅ コピーしました！記事生成ツールのメモ欄に追記してください。</div>
+  <button class="btn-copy-supp" id="btn-copy-supp" onclick="copySupplements()">📋 補足をメモに追記してコピー</button>
+  <div class="copy-done" id="copy-done">✅ 補足をメモ欄に追記して、メモ全体をコピーしました！記事生成ツールに貼ってください。</div>
 
   <div class="checklist" id="checklist">
     <div id="check-summary" class="check-summary"></div>
@@ -241,13 +241,12 @@
     const text = document.getElementById('notes').value;
     if (!text.trim()) { alert('先にメモを貼り付けてください'); return; }
 
-    let ngCount = 0, warnCount = 0;
-    const sentences = splitSentences(text);
-
     rules.forEach(rule => {
-      const found = matchRule(rule, text, sentences);
       const el = document.getElementById(rule.id);
       const icon = el.querySelector('.check-icon');
+      const label = el.querySelector('strong').textContent;
+      const suppVal = (text.match(new RegExp('^・' + label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '：(.+)$', 'm')) || [])[1] || '';
+      const found = matchRule(rule, text.replace(SUPP_BLOCK_RE, ''), splitSentences(text.replace(SUPP_BLOCK_RE, '')));
       // 既存の補足入力欄を削除（再チェック時のリセット）
       const existing = el.querySelector('.supp-input');
       if (existing) existing.remove();
@@ -259,37 +258,60 @@
         if (rule.important) {
           el.className = 'check-item ng';
           icon.textContent = '❌';
-          ngCount++;
         } else {
           el.className = 'check-item warn';
           icon.textContent = '⚠️';
-          warnCount++;
         }
         // 補足入力欄を追加
         const inp = document.createElement('input');
         inp.type = 'text';
         inp.className = 'supp-input';
         inp.placeholder = rule.q;
-        inp.dataset.label = el.querySelector('strong').textContent;
-        inp.addEventListener('input', updateCopyBtn);
+        inp.dataset.label = label;
+        inp.dataset.orig = rule.important ? 'ng' : 'warn';
+        inp.value = suppVal;
+        inp.addEventListener('input', refreshStatus);
         el.querySelector('.check-text').appendChild(inp);
       }
     });
+    refreshStatus();
 
+    document.getElementById('checklist').style.display = 'block';
+    document.getElementById('checklist').scrollIntoView({ behavior: 'smooth' });
+  }
+
+  const SUPP_BLOCK_RE = /【補足情報】[\s\S]*$/;
+
+  // 補足欄に何か入力された項目は✅扱い（「印象なし」「覚えてない」も回答として認める）
+  function refreshStatus() {
+    let ng = 0, warn = 0;
+    document.querySelectorAll('.supp-input').forEach(inp => {
+      const el = inp.closest('.check-item');
+      const icon = el.querySelector('.check-icon');
+      if (inp.value.trim()) {
+        el.className = 'check-item ok';
+        icon.textContent = '✅';
+      } else if (inp.dataset.orig === 'ng') {
+        el.className = 'check-item ng';
+        icon.textContent = '❌';
+        ng++;
+      } else {
+        el.className = 'check-item warn';
+        icon.textContent = '⚠️';
+        warn++;
+      }
+    });
     const summary = document.getElementById('check-summary');
-    if (ngCount > 0) {
+    if (ng > 0) {
       summary.className = 'check-summary has-ng';
-      summary.textContent = `❌ 重要な情報が ${ngCount} 項目不足しています。下の欄に一言入力してください。`;
-    } else if (warnCount > 0) {
+      summary.textContent = `❌ 重要な情報が ${ng} 項目不足しています。下の欄に一言入力してください。`;
+    } else if (warn > 0) {
       summary.className = 'check-summary has-warn';
-      summary.textContent = `⚠️ あると充実する項目が ${warnCount} 件あります。わかる範囲で入力してください。`;
+      summary.textContent = `⚠️ あると充実する項目が ${warn} 件あります。わかる範囲で入力してください。`;
     } else {
       summary.className = 'check-summary all-ok';
       summary.textContent = '✅ 必要な情報がすべて揃っています！';
     }
-
-    document.getElementById('checklist').style.display = 'block';
-    document.getElementById('checklist').scrollIntoView({ behavior: 'smooth' });
     updateCopyBtn();
   }
 
@@ -303,8 +325,12 @@
     document.querySelectorAll('.supp-input').forEach(inp => {
       if (inp.value.trim()) lines.push(`・${inp.dataset.label}：${inp.value.trim()}`);
     });
-    const text = '【補足情報】\n' + lines.join('\n');
-    navigator.clipboard.writeText(text).then(() => {
+    const block = '【補足情報】\n' + lines.join('\n');
+    // メモ欄にも反映（再コピー時は補足ブロックを差し替え）
+    const ta = document.getElementById('notes');
+    ta.value = ta.value.replace(SUPP_BLOCK_RE, '').replace(/\s+$/, '') + '\n\n' + block;
+    document.getElementById('char-count').textContent = ta.value.length + '文字';
+    navigator.clipboard.writeText(ta.value).then(() => {
       const done = document.getElementById('copy-done');
       done.style.display = 'block';
       setTimeout(() => { done.style.display = 'none'; }, 3000);
