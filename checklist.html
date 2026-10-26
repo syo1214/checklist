@@ -56,7 +56,9 @@
   .check-icon { font-size: 18px; flex-shrink: 0; padding-top: 1px; }
   .check-text strong { display: block; font-size: 14px; font-weight: 600; margin-bottom: 2px; }
   .check-text span { font-size: 12px; color: #999; line-height: 1.4; }
-  .char-count { font-size: 12px; color: #bbb; text-align: right; margin-top: 4px; }
+  .char-count { font-size: 12px; color: #bbb; text-align: right; margin-top: 4px; display: flex; justify-content: space-between; }
+  #save-note { color: #5b9e6f; }
+  #save-note.restored { color: #c07a2a; font-weight: 600; }
   .supp-input {
     margin-top: 8px; width: 100%; padding: 10px 12px;
     border: 1px solid #ddd; border-radius: 8px;
@@ -81,7 +83,7 @@
   <div class="card">
     <label>取材メモ（文字起こしをそのまま貼る）</label>
     <textarea id="notes" rows="10" placeholder="ChatGPTで文字起こしした内容をそのまま貼り付けてください..."></textarea>
-    <div class="char-count" id="char-count">0文字</div>
+    <div class="char-count"><span id="save-note"></span><span id="char-count">0文字</span></div>
     <button class="btn-check" onclick="checkNotes()">ヌケモレチェック</button>
     <button class="btn-clear" onclick="clearAll()">クリア</button>
   </div>
@@ -137,6 +139,14 @@
       <div id="chk-voice" class="check-item">
         <span class="check-icon"></span>
         <div class="check-text"><strong>声・喘ぎ声の描写</strong><span>甘い声・大きめ・抑えた感じなど</span></div>
+      </div>
+      <div id="chk-sequence" class="check-item">
+        <span class="check-icon"></span>
+        <div class="check-text"><strong>ベッドからの流れ</strong><span>箇条書きで。乳首責め→顔騎→アナル→聖水 など</span></div>
+      </div>
+      <div id="chk-finish" class="check-item">
+        <span class="check-icon"></span>
+        <div class="check-text"><strong>自分のフィニッシュ</strong><span>何回・どうやって（手コキ／素股など）</span></div>
       </div>
     </div>
 
@@ -213,6 +223,13 @@
       strong: ['見送','ハグ','退室','帰り際','雑談','トーク','話が弾','会話が'],
       weak: ['話','喋','笑','キス','最後'],
       context: ['盛り上が','弾','楽し','明る','終','帰','別れ','面白','ノリ','てくれ'] },
+    { id: 'chk-sequence',  important: true,  q: 'ベッドからの流れは？（箇条書きで）',
+      strong: ['ベッドからの流れ','ベッドの流れ','ベッドに移','ベッドへ移','ベッドイン'],
+      strongRe: /(→|⇒|そのあと|その後|まず|最初に|次に|続いて|最後に|からの|それから)/ },
+    { id: 'chk-finish',    important: true,  q: '自分のフィニッシュは？（何回・どうやって）',
+      strong: ['発射','フィニッシュ','射精','1回戦','2回戦','3回戦','顔射','口内','抜いてもらい','抜かれ','暴発'],
+      weak: ['イッ','イけ','出し','出た','果て'],
+      context: ['自分','こっち','こちら','1回','2回','3回','回目','何回','ラスト','最後','手コキ','素股','スマタ','フェラ','騎乗'] },
     { id: 'chk-hotel',     important: false, q: '部屋の印象は？（広さ・清潔感など）',
       strong: ['ホテル','ラブホ','部屋','ルーム','内装'],
       weak: ['ベッド','ソファ','場所','マンション'],
@@ -233,9 +250,54 @@
     return false;
   }
 
+  // ===== 自動保存（この端末のブラウザにだけ残る。他の端末には同期しない）=====
+  const LS_KEY = 'torizai-checker-v1';
+  let pendingSupp = {};      // 復元した補足。checkNotes のときに入力欄へ戻す
+  let saveTimer = null;
+
+  function saveState() {
+    try {
+      const supp = {};
+      document.querySelectorAll('.supp-input').forEach(i => {
+        if (i.value.trim()) supp[i.dataset.label] = i.value;
+      });
+      const notes = document.getElementById('notes').value;
+      if (!notes.trim() && !Object.keys(supp).length) { localStorage.removeItem(LS_KEY); return; }
+      localStorage.setItem(LS_KEY, JSON.stringify({ notes, supp, ts: Date.now() }));
+      const note = document.getElementById('save-note');
+      note.className = '';
+      note.textContent = '保存済み';
+      clearTimeout(saveTimer);
+      saveTimer = setTimeout(() => { note.textContent = ''; }, 1500);
+    } catch (e) { /* プライベートモード等で使えない場合は黙って諦める */ }
+  }
+
+  function restoreState() {
+    try {
+      const raw = localStorage.getItem(LS_KEY);
+      if (!raw) return;
+      const st = JSON.parse(raw);
+      if (!st || !st.notes || !st.notes.trim()) return;
+      document.getElementById('notes').value = st.notes;
+      document.getElementById('char-count').textContent = st.notes.length + '文字';
+      pendingSupp = st.supp || {};
+      // 先にチェックを走らせる（この中で「保存済み」表示に上書きされるため、表示は後から入れる）
+      if (Object.keys(pendingSupp).length) checkNotes();
+      const d = new Date(st.ts || Date.now());
+      const stamp = `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+      const note = document.getElementById('save-note');
+      clearTimeout(saveTimer);
+      note.className = 'restored';
+      note.textContent = `${stamp} の入力を復元しました`;
+    } catch (e) { /* 壊れたデータは無視 */ }
+  }
+
   document.getElementById('notes').addEventListener('input', function() {
     document.getElementById('char-count').textContent = this.value.length + '文字';
+    saveState();
   });
+
+  window.addEventListener('DOMContentLoaded', restoreState);
 
   function checkNotes() {
     const text = document.getElementById('notes').value;
@@ -269,7 +331,7 @@
         inp.placeholder = rule.q;
         inp.dataset.label = label;
         inp.dataset.orig = rule.important ? 'ng' : 'warn';
-        inp.value = suppVal;
+        inp.value = suppVal || pendingSupp[label] || '';
         inp.addEventListener('input', refreshStatus);
         el.querySelector('.check-text').appendChild(inp);
       }
@@ -313,6 +375,7 @@
       summary.textContent = '✅ 必要な情報がすべて揃っています！';
     }
     updateCopyBtn();
+    saveState();
   }
 
   function updateCopyBtn() {
@@ -338,6 +401,11 @@
   }
 
   function clearAll() {
+    if (!confirm('入力を全部消します。よろしいですか？')) return;
+    try { localStorage.removeItem(LS_KEY); } catch (e) {}
+    pendingSupp = {};
+    document.getElementById('save-note').textContent = '';
+    document.getElementById('save-note').className = '';
     document.getElementById('notes').value = '';
     document.getElementById('char-count').textContent = '0文字';
     document.getElementById('checklist').style.display = 'none';
