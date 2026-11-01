@@ -7,7 +7,7 @@
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Noto Sans JP', sans-serif; background: #f5f5f5; color: #333; }
-  .container { max-width: 600px; margin: 0 auto; padding: 20px 16px 60px; }
+  .container { max-width: 600px; margin: 0 auto; padding: 20px 16px 110px; }
   h1 { font-size: 18px; font-weight: 700; margin-bottom: 6px; color: #111; }
   .subtitle { font-size: 13px; color: #888; margin-bottom: 20px; }
   .card { background: #fff; border-radius: 12px; padding: 18px; margin-bottom: 14px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
@@ -66,13 +66,36 @@
     -webkit-appearance: none;
   }
   .supp-input:focus { outline: none; border-color: #5b7fff; }
-  .btn-copy-supp {
-    display: none; width: 100%; padding: 14px; background: #34a853; color: #fff;
-    border: none; border-radius: 10px; font-size: 15px; font-weight: 700;
-    cursor: pointer; margin-top: 12px;
+  .bottom-bar {
+    display: none; position: fixed; left: 0; right: 0; bottom: 0; z-index: 10;
+    background: #fff; border-top: 1px solid #e5e5e5; box-shadow: 0 -2px 8px rgba(0,0,0,0.06);
+    padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
   }
-  .btn-copy-supp.visible { display: block; }
-  .copy-done { text-align: center; font-size: 13px; color: #34a853; margin-top: 6px; display: none; }
+  .bottom-bar.visible { display: block; }
+  .bar-inner { max-width: 600px; margin: 0 auto; display: flex; align-items: center; gap: 12px; }
+  .bar-progress { font-size: 13px; font-weight: 700; color: #555; white-space: nowrap; }
+  .btn-copy-supp {
+    flex: 1; padding: 12px; background: #34a853; color: #fff;
+    border: none; border-radius: 10px; font-size: 15px; font-weight: 700;
+    cursor: pointer; -webkit-tap-highlight-color: transparent;
+  }
+  .btn-copy-supp:active { opacity: 0.85; }
+  .copy-done {
+    display: none; position: fixed; left: 50%; bottom: 76px; transform: translateX(-50%);
+    background: #34a853; color: #fff; font-size: 13px; padding: 8px 14px; border-radius: 20px;
+    z-index: 11; max-width: 90%; text-align: center;
+  }
+  .check-group-title { cursor: pointer; display: flex; justify-content: space-between; }
+  .check-group-title .grp-prog { color: #5b7fff; }
+  .check-group.collapsed .check-item { display: none; }
+  .check-item.scene { background: #f8fbff; }
+  .scene-input { border-left: 3px solid #5b7fff; line-height: 1.5; resize: vertical; }
+  .chip-row { display: flex; gap: 6px; margin-top: 6px; }
+  .chip {
+    padding: 5px 12px; font-size: 12px; border: 1px solid #ddd; border-radius: 14px;
+    background: #fff; color: #666; cursor: pointer; -webkit-tap-highlight-color: transparent;
+  }
+  .chip:active { background: #eef2ff; }
 </style>
 </head>
 <body>
@@ -88,11 +111,17 @@
     <button class="btn-clear" onclick="clearAll()">クリア</button>
   </div>
 
-  <button class="btn-copy-supp" id="btn-copy-supp" onclick="copySupplements()">📋 補足をメモに追記してコピー</button>
+  <div class="bottom-bar" id="bottom-bar">
+    <div class="bar-inner">
+      <span class="bar-progress" id="bar-progress"></span>
+      <button class="btn-copy-supp" id="btn-copy-supp" onclick="copySupplements()">📋 補足をメモに追記してコピー</button>
+    </div>
+  </div>
   <div class="copy-done" id="copy-done">✅ 補足をメモ欄に追記して、メモ全体をコピーしました！記事生成ツールに貼ってください。</div>
 
   <div class="checklist" id="checklist">
     <div id="check-summary" class="check-summary"></div>
+    <div id="scene-slot"></div>
 
     <div class="check-group">
       <div class="check-group-title">外見・体（忘れやすい）</div>
@@ -297,11 +326,16 @@
     saveState();
   });
 
-  window.addEventListener('DOMContentLoaded', restoreState);
+  window.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('.check-group-title').forEach(initGroupTitle);
+    restoreState();
+  });
 
   function checkNotes() {
     const text = document.getElementById('notes').value;
     if (!text.trim()) { alert('先にメモを貼り付けてください'); return; }
+
+    renderSceneGroup(text);
 
     rules.forEach(rule => {
       const el = document.getElementById(rule.id);
@@ -310,8 +344,7 @@
       const suppVal = (text.match(new RegExp('^・' + label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '：(.+)$', 'm')) || [])[1] || '';
       const found = matchRule(rule, text.replace(SUPP_BLOCK_RE, ''), splitSentences(text.replace(SUPP_BLOCK_RE, '')));
       // 既存の補足入力欄を削除（再チェック時のリセット）
-      const existing = el.querySelector('.supp-input');
-      if (existing) existing.remove();
+      el.querySelectorAll('.supp-input, .chip-row').forEach(n => n.remove());
 
       if (found) {
         el.className = 'check-item ok';
@@ -334,25 +367,123 @@
         inp.value = suppVal || pendingSupp[label] || '';
         inp.addEventListener('input', refreshStatus);
         el.querySelector('.check-text').appendChild(inp);
+        addChips(inp, el.querySelector('.check-text'));
       }
     });
     refreshStatus();
 
+    document.getElementById('bottom-bar').classList.add('visible');
     document.getElementById('checklist').style.display = 'block';
     document.getElementById('checklist').scrollIntoView({ behavior: 'smooth' });
   }
 
   const SUPP_BLOCK_RE = /【補足情報】[\s\S]*$/;
 
-  // 補足欄に何か入力された項目は✅扱い（「印象なし」「覚えてない」も回答として認める）
+  // ===== 取材直後に書く場面メモ（自動判定なし・常に入力欄を出す）=====
+  // ※label は localStorage・【補足情報】・記事生成ツール(app.py / index.html)が同じ文字列で参照する。
+  //   改名しないこと（改名すると保存データの復元が黙って失われる）。追加は自由。
+  const SCENE_ITEMS = [
+    { label: '見た目年齢（プロフィールとの差）', hint: 'プロフィール通り・＋1〜2歳・若く見える など', ph: '例）プロフィール通り／＋1〜2歳／5歳若く見える' },
+    { label: '入室直後のやりとり・ドキッとした瞬間', hint: '出迎え・最初の一言・距離の詰め方（いつ・何が・どう感じた）', ph: '例）入室直後に手をつないできて、ドキッとした' },
+    { label: '匂い・清潔感・タトゥーなど', hint: '香水・シャンプーの匂い／タバコ／タトゥー・傷・ほくろ', ph: '例）香水なし・タバコの匂いなし・タトゥーなし' },
+    { label: '会話の内容・人柄', hint: '盛り上がった話題・NG話題・聞き上手か・テンション', ph: '例）趣味の話で盛り上がった／出身地の話はNG' },
+    { label: 'シャワー中のやりとり', hint: '洗い方・会話・触れ合い', ph: '例）背中を洗ってくれて、ずっと体を寄せていた' },
+    { label: 'ベッドに移る時の空気', hint: '最初の触れ合い・キス・脱がせ方', ph: '例）ベッドで向かい合って、先にキスをしてきた' },
+    { label: 'テクニックの特徴', hint: '舌づかい・手つき・強弱・痛みの有無', ph: '例）舌づかいはやわらかめ／強弱の緩急あり／痛みなし' },
+    { label: '責め・受けの配分', hint: 'どちらが多いか・割合', ph: '例）責め7：受け3／ずっと受け身で楽しめた' },
+    { label: '一番良かった場面', hint: '1つだけ・何がどうだったか', ph: '例）上に乗って、目を見ながら動いてくれた時' },
+    { label: '意外だった点・ギャップ', hint: '見た目と中身の差など', ph: '例）見た目は大人しそうなのに自分から責めてきた' },
+    { label: 'プレイ後の余韻', hint: '休憩中の会話・素の表情・気配り', ph: '例）休憩中に水を渡してくれて、素の笑顔になった' },
+    { label: 'また会いたいか・料金に見合ったか', hint: 'また指名したいか・コスパ感', ph: '例）また会いたい／この料金なら妥当' },
+    { label: 'こんな人に勧めたい', hint: 'どんな人に合うか（1行）', ph: '例）受け身で甘えたい人／積極的に攻められたい人' },
+  ];
+
+  function escapeRe(str) { return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+
+  // 「なし」「覚えてない」を1タップで入れる（回答として認める。ChatGPTには「確認済みでなかった」と伝わる）
+  function addChips(inp, host) {
+    const row = document.createElement('div');
+    row.className = 'chip-row';
+    ['なし', '覚えてない'].forEach(word => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'chip';
+      b.textContent = word;
+      b.addEventListener('click', () => { inp.value = word; refreshStatus(); });
+      row.appendChild(b);
+    });
+    host.appendChild(row);
+  }
+
+  function initGroupTitle(title) {
+    if (title.dataset.ready) return;
+    title.dataset.ready = '1';
+    const base = title.textContent;
+    title.textContent = '';
+    const name = document.createElement('span');
+    name.textContent = base;
+    const prog = document.createElement('span');
+    prog.className = 'grp-prog';
+    title.append(name, prog);
+    title.addEventListener('click', () => title.parentElement.classList.toggle('collapsed'));
+  }
+
+  function renderSceneGroup(text) {
+    const slot = document.getElementById('scene-slot');
+    const keep = {};
+    slot.querySelectorAll('.supp-input').forEach(i => { keep[i.dataset.label] = i.value; });
+    slot.textContent = '';
+    const group = document.createElement('div');
+    group.className = 'check-group';
+    const title = document.createElement('div');
+    title.className = 'check-group-title';
+    title.textContent = '今日中に書く場面メモ（目安25分・なければ「なし」）';
+    group.appendChild(title);
+    SCENE_ITEMS.forEach(item => {
+      const m = text.match(new RegExp('^・' + escapeRe(item.label) + '：(.+)$', 'm'));
+      const el = document.createElement('div');
+      el.className = 'check-item scene';
+      const icon = document.createElement('span');
+      icon.className = 'check-icon';
+      icon.textContent = '✏️';
+      const box = document.createElement('div');
+      box.className = 'check-text';
+      const strong = document.createElement('strong');
+      strong.textContent = item.label;
+      const hint = document.createElement('span');
+      hint.textContent = item.hint;
+      const inp = document.createElement('textarea');
+      inp.className = 'supp-input scene-input';
+      inp.rows = 2;
+      inp.placeholder = item.ph;
+      inp.dataset.label = item.label;
+      inp.dataset.orig = 'optional';
+      inp.value = (item.label in keep) ? keep[item.label] : ((m && m[1]) || pendingSupp[item.label] || '');
+      inp.addEventListener('input', refreshStatus);
+      box.append(strong, hint, inp);
+      addChips(inp, box);
+      el.append(icon, box);
+      group.appendChild(el);
+    });
+    slot.appendChild(group);
+    initGroupTitle(title);
+  }
+
+  // 補足欄に何か入力された項目は✅扱い（「なし」「覚えてない」も回答として認める）
+  // data-orig='optional'（場面メモ）は未入力でも「不足」に数えない
   function refreshStatus() {
-    let ng = 0, warn = 0;
+    let ng = 0, warn = 0, opt = 0;
     document.querySelectorAll('.supp-input').forEach(inp => {
       const el = inp.closest('.check-item');
       const icon = el.querySelector('.check-icon');
+      const optional = inp.dataset.orig === 'optional';
       if (inp.value.trim()) {
-        el.className = 'check-item ok';
+        el.className = 'check-item ok' + (optional ? ' scene' : '');
         icon.textContent = '✅';
+      } else if (optional) {
+        el.className = 'check-item scene';
+        icon.textContent = '✏️';
+        opt++;
       } else if (inp.dataset.orig === 'ng') {
         el.className = 'check-item ng';
         icon.textContent = '❌';
@@ -364,34 +495,47 @@
       }
     });
     const summary = document.getElementById('check-summary');
+    const optNote = opt > 0 ? `／場面メモが ${opt} 件未入力（なければ「なし」を押す）` : '';
     if (ng > 0) {
       summary.className = 'check-summary has-ng';
-      summary.textContent = `❌ 重要な情報が ${ng} 項目不足しています。下の欄に一言入力してください。`;
+      summary.textContent = `❌ 重要な情報が ${ng} 項目不足しています。下の欄に一言入力してください。${optNote}`;
     } else if (warn > 0) {
       summary.className = 'check-summary has-warn';
-      summary.textContent = `⚠️ あると充実する項目が ${warn} 件あります。わかる範囲で入力してください。`;
+      summary.textContent = `⚠️ あると充実する項目が ${warn} 件あります。わかる範囲で入力してください。${optNote}`;
+    } else if (opt > 0) {
+      summary.className = 'check-summary has-warn';
+      summary.textContent = `✏️ 場面メモが ${opt} 件未入力です。なければ「なし」を押してください。`;
     } else {
       summary.className = 'check-summary all-ok';
       summary.textContent = '✅ 必要な情報がすべて揃っています！';
     }
-    updateCopyBtn();
+    updateBar();
     saveState();
   }
 
-  function updateCopyBtn() {
-    const hasAny = [...document.querySelectorAll('.supp-input')].some(i => i.value.trim());
-    document.getElementById('btn-copy-supp').classList.toggle('visible', hasAny);
+  function updateBar() {
+    const all = [...document.querySelectorAll('.supp-input')];
+    const done = all.filter(i => i.value.trim()).length;
+    document.getElementById('bar-progress').textContent = `入力済み ${done}/${all.length}`;
+    document.querySelectorAll('.check-group').forEach(g => {
+      const p = g.querySelector('.grp-prog');
+      if (!p) return;
+      const ins = [...g.querySelectorAll('.supp-input')];
+      p.textContent = ins.length ? `${ins.filter(i => i.value.trim()).length}/${ins.length}` : '';
+    });
   }
 
   function copySupplements() {
     const lines = [];
     document.querySelectorAll('.supp-input').forEach(inp => {
-      if (inp.value.trim()) lines.push(`・${inp.dataset.label}：${inp.value.trim()}`);
+      // 改行を空白に潰して1行にする（再読込時に「・ラベル：内容」が途切れないように）
+      const v = inp.value.trim().replace(/\s*\n\s*/g, ' ');
+      if (v) lines.push(`・${inp.dataset.label}：${v}`);
     });
-    const block = '【補足情報】\n' + lines.join('\n');
     // メモ欄にも反映（再コピー時は補足ブロックを差し替え）
     const ta = document.getElementById('notes');
-    ta.value = ta.value.replace(SUPP_BLOCK_RE, '').replace(/\s+$/, '') + '\n\n' + block;
+    const base = ta.value.replace(SUPP_BLOCK_RE, '').replace(/\s+$/, '');
+    ta.value = lines.length ? base + '\n\n【補足情報】\n' + lines.join('\n') : base;
     document.getElementById('char-count').textContent = ta.value.length + '文字';
     navigator.clipboard.writeText(ta.value).then(() => {
       const done = document.getElementById('copy-done');
@@ -409,7 +553,8 @@
     document.getElementById('notes').value = '';
     document.getElementById('char-count').textContent = '0文字';
     document.getElementById('checklist').style.display = 'none';
-    document.getElementById('btn-copy-supp').classList.remove('visible');
+    document.getElementById('bottom-bar').classList.remove('visible');
+    document.getElementById('scene-slot').textContent = '';
   }
 </script>
 </body>
