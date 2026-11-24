@@ -383,17 +383,17 @@
   // ※label は localStorage・【補足情報】・記事生成ツール(app.py / index.html)が同じ文字列で参照する。
   //   改名しないこと（改名すると保存データの復元が黙って失われる）。追加は自由。
   const SCENE_ITEMS = [
-    { label: '見た目年齢（プロフィールとの差）', hint: 'プロフィール通り・＋1〜2歳・若く見える など', ph: '例）プロフィール通り／＋1〜2歳／5歳若く見える' },
-    { label: '入室直後のやりとり・ドキッとした瞬間', hint: '出迎え・最初の一言・距離の詰め方（いつ・何が・どう感じた）', ph: '例）入室直後に手をつないできて、ドキッとした' },
-    { label: '匂い・清潔感・タトゥーなど', hint: '香水・シャンプーの匂い／タバコ／タトゥー・傷・ほくろ', ph: '例）香水なし・タバコの匂いなし・タトゥーなし' },
-    { label: '会話の内容・人柄', hint: '盛り上がった話題・NG話題・聞き上手か・テンション', ph: '例）趣味の話で盛り上がった／出身地の話はNG' },
-    { label: 'シャワー中のやりとり', hint: '洗い方・会話・触れ合い', ph: '例）背中を洗ってくれて、ずっと体を寄せていた' },
-    { label: 'ベッドに移る時の空気', hint: '最初の触れ合い・キス・脱がせ方', ph: '例）ベッドで向かい合って、先にキスをしてきた' },
-    { label: 'テクニックの特徴', hint: '舌づかい・手つき・強弱・痛みの有無', ph: '例）舌づかいはやわらかめ／強弱の緩急あり／痛みなし' },
-    { label: '責め・受けの配分', hint: 'どちらが多いか・割合', ph: '例）責め7：受け3／ずっと受け身で楽しめた' },
+    { label: '見た目年齢（プロフィールとの差）', hint: 'プロフィール通り・＋1〜2歳・若く見える など', ph: '例）プロフィール通り／＋1〜2歳／5歳若く見える', kw: ['年齢','歳','世代','若く','老け'] },
+    { label: '入室直後のやりとり・ドキッとした瞬間', hint: '出迎え・最初の一言・距離の詰め方（いつ・何が・どう感じた）', ph: '例）入室直後に手をつないできて、ドキッとした', kw: ['入室','挨拶','ソファ','靴','出迎え','最初にソファ'] },
+    { label: '匂い・清潔感・タトゥーなど', hint: '香水・シャンプーの匂い／タバコ／タトゥー・傷・ほくろ', ph: '例）香水なし・タバコの匂いなし・タトゥーなし', kw: ['匂い','香水','タバコ','タトゥー','傷','ほくろ'] },
+    { label: '会話の内容・人柄', hint: '盛り上がった話題・NG話題・聞き上手か・テンション', ph: '例）趣味の話で盛り上がった／出身地の話はNG', kw: ['話した','話が','会話','トーク','雑談','伝わる'] },
+    { label: 'シャワー中のやりとり', hint: '洗い方・会話・触れ合い', ph: '例）背中を洗ってくれて、ずっと体を寄せていた', kw: ['シャワー','洗体','洗う','洗って','うがい','お風呂'] },
+    { label: 'ベッドに移る時の空気', hint: '最初の触れ合い・キス・脱がせ方', ph: '例）ベッドで向かい合って、先にキスをしてきた', kw: ['脱がし','脱がせ','脱がされ','読み合い','キス','ベッドに寝','ベッドに移'] },
+    { label: 'テクニックの特徴', hint: '舌づかい・手つき・強弱・痛みの有無', ph: '例）舌づかいはやわらかめ／強弱の緩急あり／痛みなし', kw: ['舌','手コキ','フェラ','吸い','吸う','加減','強弱','唾液','ひねり','緩急'] },
+    { label: '責め・受けの配分', hint: 'どちらが多いか・割合', ph: '例）責め7：受け3／ずっと受け身で楽しめた', kw: ['責め','受け身','受け9','受け多'] },
     { label: '一番良かった場面', hint: '1つだけ・何がどうだったか', ph: '例）上に乗って、目を見ながら動いてくれた時' },
     { label: '意外だった点・ギャップ', hint: '見た目と中身の差など', ph: '例）見た目は大人しそうなのに自分から責めてきた' },
-    { label: 'プレイ後の余韻', hint: '休憩中の会話・素の表情・気配り', ph: '例）休憩中に水を渡してくれて、素の笑顔になった' },
+    { label: 'プレイ後の余韻', hint: '休憩中の会話・素の表情・気配り', ph: '例）休憩中に水を渡してくれて、素の笑顔になった', kw: ['エレベーター','ハグ','拭いてくれ','見送','傘','余韻'] },
     { label: 'また会いたいか・料金に見合ったか', hint: 'また指名したいか・コスパ感', ph: '例）また会いたい／この料金なら妥当' },
     { label: 'こんな人に勧めたい', hint: 'どんな人に合うか（1行）', ph: '例）受け身で甘えたい人／積極的に攻められたい人' },
   ];
@@ -428,6 +428,18 @@
     title.addEventListener('click', () => title.parentElement.classList.toggle('collapsed'));
   }
 
+  // メモの中に該当しそうな行があれば、場面メモ欄の候補として入れる（本人が直せる。重複行は除く・最大3行）
+  function suggestFromNotes(text, kw) {
+    if (!kw) return '';
+    const seen = new Set(), out = [];
+    text.replace(SUPP_BLOCK_RE, '').split('\n').forEach(raw => {
+      const line = raw.replace(/^[\s・\-－]+/, '').trim();
+      if (!line || line.length > 60 || seen.has(line)) return;
+      if (kw.some(k => line.includes(k))) { seen.add(line); out.push(line); }
+    });
+    return out.slice(0, 3).join('／');
+  }
+
   function renderSceneGroup(text) {
     const slot = document.getElementById('scene-slot');
     const keep = {};
@@ -458,7 +470,7 @@
       inp.placeholder = item.ph;
       inp.dataset.label = item.label;
       inp.dataset.orig = 'optional';
-      inp.value = (item.label in keep) ? keep[item.label] : ((m && m[1]) || pendingSupp[item.label] || '');
+      inp.value = (item.label in keep) ? keep[item.label] : ((m && m[1]) || pendingSupp[item.label] || suggestFromNotes(text, item.kw));
       inp.addEventListener('input', refreshStatus);
       box.append(strong, hint, inp);
       addChips(inp, box);
